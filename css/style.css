@@ -550,3 +550,12 @@ noscript h1 {
 .sel-btn-delete:hover {
 	background: rgba(200, 60, 60, 0.3);
 }
+
+.sel-btn-viewer {
+	border-color: rgba(60, 160, 200, 0.7);
+	color: rgba(160, 220, 255, 1);
+}
+
+.sel-btn-viewer:hover {
+	background: rgba(60, 160, 200, 0.3);
+}

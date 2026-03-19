@@ -7,7 +7,7 @@
     "dev": "vite"
   },
   "keywords": [],
-  "author": "github.com/VodBox",
+  "author": "github.com/VodBox,github.com/pnwmatt",
   "license": "MIT License",
   "packageManager": "pnpm@10.15.1",
   "devDependencies": {

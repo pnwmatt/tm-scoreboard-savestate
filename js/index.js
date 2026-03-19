@@ -12,6 +12,13 @@
 	var currentBackground = null;
 	var STORAGE_KEY = 'tm-games';
 
+	// Viewer mode: ?viewer=GAMEID opens a read-only display tab
+	var viewerMatch = location.search.match(/[?&]viewer=([^&]+)/);
+	var isViewer = !!viewerMatch;
+	var viewerGameId = viewerMatch ? decodeURIComponent(viewerMatch[1]) : null;
+
+	var channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tm-scoreboard') : null;
+
 	var main = document.querySelector("main");
 	var fileInput = document.querySelector("#file-input");
 	var playButton = document.querySelector("#play-button");
@@ -47,6 +54,9 @@
 			console.log('[bg] callback called, url length:', url && url.length);
 			applyBackground(url);
 			saveCurrentGame();
+			if (channel && currentGameId) {
+				channel.postMessage({ type: 'background', gameId: currentGameId, url: url });
+			}
 		};
 		bgInput.click();
 	});
@@ -75,6 +85,7 @@
 
 	function saveCurrentGame() {
 		if (currentGameId === null) return;
+		if (isViewer) return;
 		var games = loadGames();
 		var data = contestants.map(function (con) {
 			return { image: con.image, score: con.score, oldScore: con.oldScore };
@@ -138,7 +149,7 @@
 		frame.removeAttribute("width");
 		frame.removeAttribute("height");
 
-		frame.addEventListener("click", function() {
+		if (!isViewer) frame.addEventListener("click", function() {
 			var cb = function () {
 				if (fileInput.files && fileInput.files[0]) {
 					var reader = new FileReader();
@@ -196,7 +207,7 @@
 		input.type = "number";
 
 		scoreContainer.isOpen = false;
-		scoreContainer.addEventListener("mouseup", function(evt) {
+		if (!isViewer) scoreContainer.addEventListener("mouseup", function(evt) {
 			scoreContainer.isOpen = !scoreContainer.isOpen;
 
 			if(scoreContainer.isOpen) {
@@ -336,6 +347,10 @@
 	}
 
 	function play() {
+		if (channel && !isViewer) {
+			channel.postMessage({ type: 'play', gameId: currentGameId });
+		}
+
 		playButton.style.display = "none";
 		bgBtn.style.display = 'none';
 
@@ -498,6 +513,16 @@
 		deleteBtn.addEventListener('click', (function (gid) { return function () { deleteGame(gid); }; })(game.id));
 		row.appendChild(deleteBtn);
 
+		var viewerBtn = document.createElement('button');
+		viewerBtn.classList.add('sel-btn', 'sel-btn-viewer');
+		viewerBtn.innerText = 'Open Viewer';
+		viewerBtn.addEventListener('click', (function (gid) {
+			return function () {
+				window.open(location.pathname + '?viewer=' + encodeURIComponent(gid), '_blank');
+			};
+		})(game.id));
+		row.appendChild(viewerBtn);
+
 		return row;
 	}
 
@@ -536,19 +561,68 @@
 		if (s) s.parentNode.removeChild(s);
 	}
 
-	// --- Initialization ---
+	// --- Viewer mode ---
 
-	var games = loadGames();
-	if (games.length === 0) {
-		// First ever load: no saved games, go straight to scoreboard
-		currentGameId = generateId();
-		for (var i = 0; i < 5; ++i) addContestant();
-		saveCurrentGame();
-		bgBtn.style.display = 'block';
-		refreshContestants();
-	} else {
-		// Saved games exist: show selection screen
-		showSelectionScreen();
+	if (isViewer) {
+		// Hide admin-only UI permanently
+		playButton.style.display = 'none';
+		bgBtn.style.display = 'none';
+		document.body.classList.add('locked');
+		locked = true;
+
+		function viewerLock() {
+			locked = true;
+			document.body.classList.add('locked');
+			playButton.style.display = 'none';
+			bgBtn.style.display = 'none';
+		}
+
+		// Load the specified game immediately
+		var viewerGames = loadGames();
+		for (var vi = 0; vi < viewerGames.length; vi++) {
+			if (viewerGames[vi].id === viewerGameId) {
+				resumeGame(viewerGames[vi]);
+				viewerLock();
+				break;
+			}
+		}
+
+		// Listen for admin commands
+		if (channel) {
+			channel.onmessage = function(e) {
+				if (e.data.gameId !== viewerGameId) return;
+				if (e.data.type === 'play') {
+					var gs = loadGames();
+					for (var gi = 0; gi < gs.length; gi++) {
+						if (gs[gi].id === viewerGameId) {
+							resumeGame(gs[gi]);
+							viewerLock();
+							play();
+							break;
+						}
+					}
+				} else if (e.data.type === 'background') {
+					applyBackground(e.data.url);
+				}
+			};
+		}
+	}
+
+	// --- Initialization (admin only) ---
+
+	if (!isViewer) {
+		var games = loadGames();
+		if (games.length === 0) {
+			// First ever load: no saved games, go straight to scoreboard
+			currentGameId = generateId();
+			for (var i = 0; i < 5; ++i) addContestant();
+			saveCurrentGame();
+			bgBtn.style.display = 'block';
+			refreshContestants();
+		} else {
+			// Saved games exist: show selection screen
+			showSelectionScreen();
+		}
 	}
 
 	function resize(rep) {
