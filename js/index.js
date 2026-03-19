@@ -69,6 +69,21 @@
 		console.log('[bg] documentElement.style.backgroundImage set to:', document.documentElement.style.backgroundImage.slice(0, 60));
 	}
 
+	function compressImage(dataUrl, maxWidth, maxHeight, quality, callback) {
+		var img = new Image();
+		img.onload = function () {
+			var w = img.width, h = img.height;
+			if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+			if (h > maxHeight) { w = Math.round(w * maxHeight / h); h = maxHeight; }
+			var canvas = document.createElement('canvas');
+			canvas.width = w;
+			canvas.height = h;
+			canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+			callback(canvas.toDataURL('image/jpeg', quality));
+		};
+		img.src = dataUrl;
+	}
+
 	function generateId() {
 		return Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
 	}
@@ -79,8 +94,14 @@
 	}
 
 	function saveGames(games) {
-		try { localStorage.setItem(STORAGE_KEY, JSON.stringify(games)); }
-		catch (e) { console.warn('tm-scoreboard: localStorage save failed', e); }
+		try {
+			var json = JSON.stringify(games);
+			console.log('[save] saveGames called, payload size:', json.length, 'chars (~' + (json.length / 1024).toFixed(1) + ' KB)');
+			localStorage.setItem(STORAGE_KEY, json);
+			console.log('[save] saveGames succeeded');
+		} catch (e) {
+			console.error('[save] saveGames FAILED:', e);
+		}
 	}
 
 	function saveCurrentGame() {
@@ -149,7 +170,7 @@
 		frame.removeAttribute("width");
 		frame.removeAttribute("height");
 
-		if (!isViewer) frame.addEventListener("click", function() {
+		if (!isViewer) frame.addEventListener("click", function () {
 			var cb = function () {
 				if (fileInput.files && fileInput.files[0]) {
 					var reader = new FileReader();
@@ -207,10 +228,10 @@
 		input.type = "number";
 
 		scoreContainer.isOpen = false;
-		if (!isViewer) scoreContainer.addEventListener("mouseup", function(evt) {
+		if (!isViewer) scoreContainer.addEventListener("mouseup", function (evt) {
 			scoreContainer.isOpen = !scoreContainer.isOpen;
 
-			if(scoreContainer.isOpen) {
+			if (scoreContainer.isOpen) {
 				scoreContainer.appendChild(input);
 				input.value = con.score;
 				input.focus();
@@ -220,7 +241,7 @@
 			}
 		});
 
-		var exit = function() {
+		var exit = function () {
 			scoreContainer.isOpen = false;
 			scoreContainer.removeChild(input);
 
@@ -234,13 +255,13 @@
 		};
 
 		input.addEventListener("focusout", exit);
-		input.addEventListener("onkeydown", function(evt) {
+		input.addEventListener("onkeydown", function (evt) {
 			if (evt.key === "Enter") {
 				exit();
 			}
 		});
 
-		input.addEventListener("mouseup", function(evt) {
+		input.addEventListener("mouseup", function (evt) {
 			evt.stopPropagation();
 			evt.stopImmediatePropagation();
 		});
@@ -253,7 +274,7 @@
 
 	function transformContestants() {
 
-		contestants.sort(function(first, second) {
+		contestants.sort(function (first, second) {
 			if (first.score < second.score) {
 				return -1;
 			} else if (first.score > second.score) {
@@ -268,7 +289,7 @@
 		var maxCount = 1;
 
 		for (var i = contestants.length - 1; i > 0; --i) {
-			var con = contestants[i-1];
+			var con = contestants[i - 1];
 			if (con.score == maxScore) {
 				++maxCount;
 			}
@@ -305,7 +326,7 @@
 		res.style.msTransform = "translateX(" + (275 * len + 30) + "px)";
 		res.style.transform = "translateX(" + (275 * len + 30) + "px)";
 
-		res.addEventListener("click", function() {
+		res.addEventListener("click", function () {
 			addContestant();
 			refreshContestants();
 			resize();
@@ -319,7 +340,7 @@
 		main.innerHTML = "";
 
 		for (var i = contestants.length; i > 0; --i) {
-			var con = contestants[i-1];
+			var con = contestants[i - 1];
 
 			var cEl = createContestantEl(con, i);
 			con.el = cEl;
@@ -328,7 +349,7 @@
 		if (contestants.length > 0) transformContestants();
 
 		for (var i = contestants.length; i > 0; --i) {
-			var con = contestants[i-1];
+			var con = contestants[i - 1];
 			main.appendChild(con.el);
 		}
 
@@ -363,9 +384,9 @@
 			saveCurrentGame();
 		}
 
-		setTimeout(function() {
+		setTimeout(function () {
 			var start = 0;
-			var loop = function(dt) {
+			var loop = function (dt) {
 				if (start == 0) {
 					start = dt;
 				}
@@ -469,12 +490,15 @@
 		bgThumb.addEventListener('click', (function (g, thumb) {
 			return function () {
 				bgCallback = function (url) {
+					console.log('[save] bgThumb callback fired, game id:', g.id, 'url length:', url && url.length);
 					g.background = url;
 					thumb.style.backgroundImage = 'url(' + url + ')';
 					var games = loadGames();
+					var found = false;
 					for (var i = 0; i < games.length; i++) {
-						if (games[i].id === g.id) { games[i].background = url; break; }
+						if (games[i].id === g.id) { games[i].background = url; found = true; break; }
 					}
+					console.log('[save] game found in loadGames:', found, ', total games:', games.length);
 					saveGames(games);
 				};
 				bgInput.click();
@@ -589,7 +613,7 @@
 
 		// Listen for admin commands
 		if (channel) {
-			channel.onmessage = function(e) {
+			channel.onmessage = function (e) {
 				if (e.data.gameId !== viewerGameId) return;
 				if (e.data.type === 'play') {
 					var gs = loadGames();
