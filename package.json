@@ -1,0 +1,16 @@
+{
+  "name": "tm-scoreboard-savestate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite"
+  },
+  "keywords": [],
+  "author": "github.com/VodBox",
+  "license": "MIT License",
+  "packageManager": "pnpm@10.15.1",
+  "devDependencies": {
+    "vite": "^8.0.1"
+  }
+}
